@@ -83,5 +83,6 @@ CloudFormation do
   }
 
   Output('EcsCluster', Ref('EcsCluster'))
-
+  Output('SecurityGroupEcs', Ref('SecurityGroupEcs'))
+  
 end
