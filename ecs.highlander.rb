@@ -28,5 +28,7 @@ HighlanderComponent do
     OutputParam component: 'vpc', name: "VPCId"
     OutputParam component: 'loadbalancer', name: 'SecurityGroupLoadBalancer'
     OutputParam component: 'bastion', name: 'SecurityGroupBastion'
+    OutputParam component: 'efs', name: 'FileSystem' if enable_efs
+
   end
 end

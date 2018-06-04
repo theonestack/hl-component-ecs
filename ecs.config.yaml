@@ -2,3 +2,5 @@ maximum_availability_zones: 5
 
 component_version: 0.0.1
 log_group_retention: 14
+
+enable_efs: false
