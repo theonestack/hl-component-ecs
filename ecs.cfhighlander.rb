@@ -1,5 +1,5 @@
 CfhighlanderTemplate do
-  DependsOn 'vpc'
+  DependsOn 'vpc@1.2.0'
   Parameters do
     ComponentParam 'EnvironmentName', 'dev', isGlobal: true
     ComponentParam 'EnvironmentType', 'development', isGlobal: true
