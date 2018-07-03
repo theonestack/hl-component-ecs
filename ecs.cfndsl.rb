@@ -29,14 +29,15 @@ CloudFormation do
     SourceSecurityGroupId Ref('SecurityGroupBastion')
   end
 
+  policies = []
+  iam_policies.each do |name,policy|
+    policies << iam_policy_allow(name,policy['action'],policy['resource'] || '*')
+  end if defined? iam
+
   Role('Role') do
     AssumeRolePolicyDocument service_role_assume_policy('ec2')
     Path '/'
-    Policies(IAMPolicies.new.create_policies([
-      'cloudwatch-logs',
-      'ecs-service-role',
-      'ec2-describe'
-    ]))
+    Policies(policies)
   end
 
   InstanceProfile('InstanceProfile') do
@@ -47,7 +48,7 @@ CloudFormation do
   user_data = []
   user_data << "#!/bin/bash\n"
   user_data << "INSTANCE_ID=$(/opt/aws/bin/ec2-metadata --instance-id|/usr/bin/awk '{print $2}')\n"
-  user_data << "hostname " 
+  user_data << "hostname "
   user_data << Ref("EnvironmentName")
   user_data << "-ecs-${INSTANCE_ID}\n"
   user_data << "sed '/HOSTNAME/d' /etc/sysconfig/network > /tmp/network && mv -f /tmp/network /etc/sysconfig/network && echo \"HOSTNAME="
@@ -100,5 +101,5 @@ CloudFormation do
 
   Output('EcsCluster', Ref('EcsCluster'))
   Output('SecurityGroupEcs', Ref('SecurityGroupEcs'))
-  
+
 end
