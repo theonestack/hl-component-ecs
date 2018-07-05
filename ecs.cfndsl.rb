@@ -32,7 +32,7 @@ CloudFormation do
   policies = []
   iam_policies.each do |name,policy|
     policies << iam_policy_allow(name,policy['action'],policy['resource'] || '*')
-  end if defined? iam
+  end if defined? iam_policies
 
   Role('Role') do
     AssumeRolePolicyDocument service_role_assume_policy('ec2')
