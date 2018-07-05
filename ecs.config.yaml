@@ -4,3 +4,29 @@ component_version: 0.0.1
 log_group_retention: 14
 
 enable_efs: false
+
+iam_policies:
+  ecs-container-instance:
+    action:
+      - ecs:CreateCluster
+      - ecs:DeregisterContainerInstance
+      - ecs:DiscoverPollEndpoint
+      - ecs:Poll
+      - ecs:RegisterContainerInstance
+      - ecs:StartTelemetrySession
+      - ecs:Submit*
+      - ecr:GetAuthorizationToken
+      - ecr:BatchCheckLayerAvailability
+      - ecr:GetDownloadUrlForLayer
+      - ecr:BatchGetImage
+      - logs:CreateLogStream
+      - logs:PutLogEvents
+  ecs-service-scheduler:
+    action:
+      - ec2:AuthorizeSecurityGroupIngress
+      - ec2:Describe*
+      - elasticloadbalancing:DeregisterInstancesFromLoadBalancer
+      - elasticloadbalancing:DeregisterTargets
+      - elasticloadbalancing:Describe*
+      - elasticloadbalancing:RegisterInstancesWithLoadBalancer
+      - elasticloadbalancing:RegisterTargets
