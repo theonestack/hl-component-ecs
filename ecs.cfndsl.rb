@@ -4,7 +4,9 @@ CloudFormation do
 
   az_conditions_resources('SubnetCompute', maximum_availability_zones)
 
-  ECS_Cluster('EcsCluster')
+  ECS_Cluster('EcsCluster') {
+    ClusterName FnSub("${EnvironmentName}-#{cluster_name}") if defined? cluster_name
+  }
 
   EC2_SecurityGroup('SecurityGroupEcs') do
     GroupDescription FnJoin(' ', [ Ref('EnvironmentName'), component_name ])
@@ -99,7 +101,17 @@ CloudFormation do
     RetentionInDays "#{log_group_retention}"
   }
 
-  Output('EcsCluster', Ref('EcsCluster'))
-  Output('SecurityGroupEcs', Ref('SecurityGroupEcs'))
+  Output("EcsCluster") {
+    Value(Ref('EcsCluster'))
+    Export FnSub("${EnvironmentName}-#{component_name}-EcsCluster")
+  }
+  Output("EcsClusterArn") {
+    Value(FnGetAtt('EcsCluster','Arn'))
+    Export FnSub("${EnvironmentName}-#{component_name}-EcsClusterArn")
+  }
+  Output('EcsSecurityGroup') {
+    Value(Ref('SecurityGroupEcs'))
+    Export FnSub("${EnvironmentName}-#{component_name}-EcsSecurityGroup")
+  }
 
 end
