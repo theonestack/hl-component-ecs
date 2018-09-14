@@ -8,6 +8,20 @@ log_group_retention: 14
 
 enable_efs: false
 
+security_groups:
+  -
+    Description: 'Ephemeral port range for ECS'
+    IpProtocol: 'tcp'
+    FromPort: '32768'
+    ToPort: '65535'
+    SourceSecurityGroup: SecurityGroupLoadBalancer
+  -
+    Description: 'SSH access from bastion'
+    IpProtocol: 'tcp'
+    FromPort: '22'
+    SourceSecurityGroup: SecurityGroupBastion
+
+
 iam_policies:
   ecs-container-instance:
     action:

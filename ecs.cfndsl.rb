@@ -13,23 +13,21 @@ CloudFormation do
     VpcId Ref('VPCId')
   end
 
-  EC2_SecurityGroupIngress('LoadBalancerIngressRule') do
-    Description 'Ephemeral port range for ECS'
-    IpProtocol 'tcp'
-    FromPort '32768'
-    ToPort '65535'
-    GroupId FnGetAtt('SecurityGroupEcs','GroupId')
-    SourceSecurityGroupId Ref('SecurityGroupLoadBalancer')
-  end
+  security_groups.each do |rule|
 
-  EC2_SecurityGroupIngress('BastionIngressRule') do
-    Description 'SSH access from bastion'
-    IpProtocol 'tcp'
-    FromPort '22'
-    ToPort '22'
-    GroupId FnGetAtt('SecurityGroupEcs','GroupId')
-    SourceSecurityGroupId Ref('SecurityGroupBastion')
-  end
+    proctocol = rule.has_key?('IpProtocol') ? rule['IpProtocol'] : 'tcp'
+    to_port = rule.has_key?('ToPort') ? rule['ToPort'] : rule['FromPort']
+
+    EC2_SecurityGroupIngress("#{rule['SourceSecurityGroup']}Rule") do
+      Description rule['Description'] if rule.has_key?('Description')
+      IpProtocol proctocol
+      FromPort rule['FromPort']
+      ToPort to_port
+      GroupId FnGetAtt('SecurityGroupEcs','GroupId')
+      SourceSecurityGroupId Ref(rule['SourceSecurityGroup'])
+    end
+  end if defined? security_groups
+
 
   policies = []
   iam_policies.each do |name,policy|

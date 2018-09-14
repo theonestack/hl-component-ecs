@@ -30,9 +30,11 @@ CfhighlanderTemplate do
     end
 
     ComponentParam 'VPCId', type: 'AWS::EC2::VPC::Id'
-    ComponentParam 'SecurityGroupLoadBalancer', type: 'AWS::EC2::SecurityGroup::Id'
-    ComponentParam 'SecurityGroupBastion', type: 'AWS::EC2::SecurityGroup::Id'
     ComponentParam 'FileSystem' if enable_efs
+
+    security_groups.each do |rule|
+      ComponentParam rule['SourceSecurityGroup'], type: 'AWS::EC2::SecurityGroup::Id'
+    end if defined? security_groups
 
   end
 end
