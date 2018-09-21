@@ -15,7 +15,7 @@ $ cfhighlander cfcompile --validate ecs
 
 ### Parameters
 
-TBD
+`SecurityGroupLoadBalancer` - Group allowed to access ECS Cluster 
 
 ### Configuration options
 

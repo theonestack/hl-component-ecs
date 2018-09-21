@@ -69,12 +69,14 @@ CloudFormation do
     user_data << ".amazonaws.com:/ /efs\n"
   end
 
+  Condition('LaunchConfigKeySet', FnNot(FnEquals(Ref('KeyName'),'')))
+
   LaunchConfiguration('LaunchConfig') do
     ImageId Ref('Ami')
     InstanceType Ref('InstanceType')
     AssociatePublicIpAddress false
     IamInstanceProfile Ref('InstanceProfile')
-    KeyName Ref('KeyName')
+    KeyName FnIf('LaunchConfigKeySet', Ref('KeyName'), Ref('AWS::NoValue'))
     SecurityGroups [ Ref('SecurityGroupEcs') ]
     UserData FnBase64(FnJoin('',user_data))
   end

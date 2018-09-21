@@ -1,18 +1,18 @@
 CfhighlanderTemplate do
-  DependsOn 'vpc@1.2.0'
+  DependsOn stdext
   Parameters do
     ComponentParam 'EnvironmentName', 'dev', isGlobal: true
     ComponentParam 'EnvironmentType', 'development', isGlobal: true
     ComponentParam 'Ami', type: 'AWS::EC2::Image::Id'
-    MappingParam('InstanceType') do
+    MappingParam('InstanceType', 't2.medium') do
       map 'EnvironmentType'
       attribute 'EcsInstanceType'
     end
-    MappingParam('AsgMin') do
+    MappingParam('AsgMin', 1) do
       map 'EnvironmentType'
       attribute 'EcsAsgMin'
     end
-    MappingParam('AsgMax') do
+    MappingParam('AsgMax', 1) do
       map 'EnvironmentType'
       attribute 'EcsAsgMax'
     end
@@ -27,6 +27,10 @@ CfhighlanderTemplate do
 
     maximum_availability_zones.times do |az|
       ComponentParam "SubnetCompute#{az}"
+      MappingParam "Az#{az}" do
+        map 'AzMappings'
+        attribute "Az#{az}"
+      end
     end
 
     ComponentParam 'VPCId', type: 'AWS::EC2::VPC::Id'
