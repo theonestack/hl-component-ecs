@@ -82,8 +82,17 @@ CloudFormation do
     user_data << ".amazonaws.com:/ /efs\n"
   end
 
+  volumes = []
+  volumes << {
+    DeviceName: '/dev/xvda',
+    Ebs: {
+      VolumeSize: volume_size
+    }
+  } if defined? volume_size
+
   LaunchConfiguration('LaunchConfig') do
     ImageId Ref('Ami')
+    BlockDeviceMappings volumes if defined? volume_size
     InstanceType Ref('InstanceType')
     AssociatePublicIpAddress false
     IamInstanceProfile Ref('InstanceProfile')
