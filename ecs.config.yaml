@@ -3,8 +3,8 @@ maximum_availability_zones: 5
 # cluster name is prefixed with environment name
 # cluster_name: cluster
 
-# extra_tags:
-#   Tag: Value
+# ecs_extra_tags:
+#   Name: Value
 
 component_version: 0.0.1
 log_group_retention: 14

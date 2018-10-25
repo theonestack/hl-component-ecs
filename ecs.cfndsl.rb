@@ -4,25 +4,18 @@ CloudFormation do
 
   az_conditions_resources('SubnetCompute', maximum_availability_zones)
 
-  config_tags = []
-  extra_tags.each { |key,value| config_tags << { Key: "#{key}", Value: value } }
+  asg_ecs_tags = []
+  asg_ecs_tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, '-xx' ]), PropagateAtLaunch: true }
+  asg_ecs_tags << { Key: 'Environment', Value: Ref(:EnvironmentName), PropagateAtLaunch: true}
+  asg_ecs_tags << { Key: 'EnvironmentType', Value: Ref(:EnvironmentType), PropagateAtLaunch: true }
+  asg_ecs_tags << { Key: 'Role', Value: "ecs", PropagateAtLaunch: true }
+
+  asg_ecs_extra_tags = []
+  ecs_extra_tags.each { |key,value| asg_ecs_extra_tags << { Key: "#{key}", Value: value, PropagateAtLaunch: true } } if defined? ecs_extra_tags
 
 
-  tags = []
-  tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, '-xx' ]) }
-  tags << { Key: 'Environment', Value: Ref(:EnvironmentName) }
-  tags << { Key: 'EnvironmentType', Value: Ref(:EnvironmentType) }
-  tags << { Key: 'Role', Value: "ecs" }
+  asg_ecs_tags = (asg_ecs_extra_tags + asg_ecs_tags).uniq { |h| h[:Key] }
 
-
-  tags = (config_tags + tags).uniq { |h| h[:Key] }
-
-  asg_tags = []
-  tags.each do |tag|
-    tag.merge!({PropagateAtLaunch: true})
-    asg_tags << tag
-  end
-  
 
   ECS_Cluster('EcsCluster') {
     ClusterName FnSub("${EnvironmentName}-#{cluster_name}") if defined? cluster_name
@@ -111,7 +104,7 @@ CloudFormation do
     MinSize Ref('AsgMin')
     MaxSize Ref('AsgMax')
     VPCZoneIdentifier az_conditional_resources('SubnetCompute', maximum_availability_zones)
-    Tags asg_tags
+    Tags asg_ecs_tags
   end
 
   Logs_LogGroup('LogGroup') {
