@@ -4,6 +4,26 @@ CloudFormation do
 
   az_conditions_resources('SubnetCompute', maximum_availability_zones)
 
+  config_tags = []
+  extra_tags.each { |key,value| config_tags << { Key: "#{key}", Value: value } }
+
+
+  tags = []
+  tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, '-xx' ]) }
+  tags << { Key: 'Environment', Value: Ref(:EnvironmentName) }
+  tags << { Key: 'EnvironmentType', Value: Ref(:EnvironmentType) }
+  tags << { Key: 'Role', Value: "ecs" }
+
+
+  tags = (config_tags + tags).uniq { |h| h[:Key] }
+
+  asg_tags = []
+  tags.each do |tag|
+    tag.merge!({PropagateAtLaunch: true})
+    asg_tags << tag
+  end
+  
+
   ECS_Cluster('EcsCluster') {
     ClusterName FnSub("${EnvironmentName}-#{cluster_name}") if defined? cluster_name
   }
@@ -79,6 +99,7 @@ CloudFormation do
     UserData FnBase64(FnJoin('',user_data))
   end
 
+
   AutoScalingGroup('AutoScaleGroup') do
     UpdatePolicy('AutoScalingRollingUpdate', {
       "MinInstancesInService" => "0",
@@ -90,10 +111,7 @@ CloudFormation do
     MinSize Ref('AsgMin')
     MaxSize Ref('AsgMax')
     VPCZoneIdentifier az_conditional_resources('SubnetCompute', maximum_availability_zones)
-    addTag("Name", FnJoin("",[Ref('EnvironmentName'), "-ecs-xx"]), true)
-    addTag("Environment",Ref('EnvironmentName'), true)
-    addTag("EnvironmentType", Ref('EnvironmentType'), true)
-    addTag("Role", "ecs", true)
+    Tags asg_tags
   end
 
   Logs_LogGroup('LogGroup') {
