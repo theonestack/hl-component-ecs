@@ -5,7 +5,7 @@ CloudFormation do
   az_conditions_resources('SubnetCompute', maximum_availability_zones)
 
   asg_ecs_tags = []
-  asg_ecs_tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, '-xx' ]), PropagateAtLaunch: true }
+  asg_ecs_tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, 'xx' ]), PropagateAtLaunch: true }
   asg_ecs_tags << { Key: 'Environment', Value: Ref(:EnvironmentName), PropagateAtLaunch: true}
   asg_ecs_tags << { Key: 'EnvironmentType', Value: Ref(:EnvironmentType), PropagateAtLaunch: true }
   asg_ecs_tags << { Key: 'Role', Value: "ecs", PropagateAtLaunch: true }
