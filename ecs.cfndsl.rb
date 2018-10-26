@@ -72,6 +72,12 @@ CloudFormation do
   user_data << "echo ECS_CLUSTER="
   user_data << Ref("EcsCluster")
   user_data << " >> /etc/ecs/ecs.config\n"
+  user_data << "echo ECS_ENGINE_TASK_CLEANUP_WAIT_DURATION=10m"
+  user_data << " >> /etc/ecs/ecs.config\n"
+  user_data << "echo ECS_IMAGE_CLEANUP_INTERVAL=10m"
+  user_data << " >> /etc/ecs/ecs.config\n"
+  user_data << "echo ECS_IMAGE_MINIMUM_CLEANUP_AGE=5m"
+  user_data << " >> /etc/ecs/ecs.config\n"
   if enable_efs
     user_data << "mkdir /efs\n"
     user_data << "yum install -y nfs-utils\n"
