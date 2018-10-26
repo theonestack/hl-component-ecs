@@ -3,6 +3,12 @@ maximum_availability_zones: 5
 # cluster name is prefixed with environment name
 # cluster_name: cluster
 
+# ecs_extra_tags:
+#   Name: Value
+
+
+# volume_size: 20
+
 component_version: 0.0.1
 log_group_retention: 14
 

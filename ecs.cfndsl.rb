@@ -4,6 +4,19 @@ CloudFormation do
 
   az_conditions_resources('SubnetCompute', maximum_availability_zones)
 
+  asg_ecs_tags = []
+  asg_ecs_tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, '-xx' ]), PropagateAtLaunch: true }
+  asg_ecs_tags << { Key: 'Environment', Value: Ref(:EnvironmentName), PropagateAtLaunch: true}
+  asg_ecs_tags << { Key: 'EnvironmentType', Value: Ref(:EnvironmentType), PropagateAtLaunch: true }
+  asg_ecs_tags << { Key: 'Role', Value: "ecs", PropagateAtLaunch: true }
+
+  asg_ecs_extra_tags = []
+  ecs_extra_tags.each { |key,value| asg_ecs_extra_tags << { Key: "#{key}", Value: value, PropagateAtLaunch: true } } if defined? ecs_extra_tags
+
+
+  asg_ecs_tags = (asg_ecs_extra_tags + asg_ecs_tags).uniq { |h| h[:Key] }
+
+
   ECS_Cluster('EcsCluster') {
     ClusterName FnSub("${EnvironmentName}-#{cluster_name}") if defined? cluster_name
   }
@@ -69,8 +82,17 @@ CloudFormation do
     user_data << ".amazonaws.com:/ /efs\n"
   end
 
+  volumes = []
+  volumes << {
+    DeviceName: '/dev/xvda',
+    Ebs: {
+      VolumeSize: volume_size
+    }
+  } if defined? volume_size
+
   LaunchConfiguration('LaunchConfig') do
     ImageId Ref('Ami')
+    BlockDeviceMappings volumes if defined? volume_size
     InstanceType Ref('InstanceType')
     AssociatePublicIpAddress false
     IamInstanceProfile Ref('InstanceProfile')
@@ -78,6 +100,7 @@ CloudFormation do
     SecurityGroups [ Ref('SecurityGroupEcs') ]
     UserData FnBase64(FnJoin('',user_data))
   end
+
 
   AutoScalingGroup('AutoScaleGroup') do
     UpdatePolicy('AutoScalingRollingUpdate', {
@@ -90,10 +113,7 @@ CloudFormation do
     MinSize Ref('AsgMin')
     MaxSize Ref('AsgMax')
     VPCZoneIdentifier az_conditional_resources('SubnetCompute', maximum_availability_zones)
-    addTag("Name", FnJoin("",[Ref('EnvironmentName'), "-ecs-xx"]), true)
-    addTag("Environment",Ref('EnvironmentName'), true)
-    addTag("EnvironmentType", Ref('EnvironmentType'), true)
-    addTag("Role", "ecs", true)
+    Tags asg_ecs_tags
   end
 
   Logs_LogGroup('LogGroup') {
