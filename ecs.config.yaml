@@ -6,6 +6,16 @@ maximum_availability_zones: 5
 # ecs_extra_tags:
 #   Name: Value
 
+# ecs_agent_extra_config:
+#   ECS_ENGINE_TASK_CLEANUP_WAIT_DURATION: 10m
+#   ECS_IMAGE_CLEANUP_INTERVAL: 10m
+#   ECS_IMAGE_MINIMUM_CLEANUP_AGE: 5m
+
+# asg_update_policy:
+#   AutoScalingRollingUpdate:
+#     MaxBatchSize: 1
+#     MinInstancesInService: 1
+#     SuspendProcesses: ["HealthCheck","ReplaceUnhealthy","AZRebalance","AlarmNotification","ScheduledActions"]
 
 # volume_size: 20
 

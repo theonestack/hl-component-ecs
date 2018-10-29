@@ -72,12 +72,6 @@ CloudFormation do
   user_data << "echo ECS_CLUSTER="
   user_data << Ref("EcsCluster")
   user_data << " >> /etc/ecs/ecs.config\n"
-  user_data << "echo ECS_ENGINE_TASK_CLEANUP_WAIT_DURATION=10m"
-  user_data << " >> /etc/ecs/ecs.config\n"
-  user_data << "echo ECS_IMAGE_CLEANUP_INTERVAL=10m"
-  user_data << " >> /etc/ecs/ecs.config\n"
-  user_data << "echo ECS_IMAGE_MINIMUM_CLEANUP_AGE=5m"
-  user_data << " >> /etc/ecs/ecs.config\n"
   if enable_efs
     user_data << "mkdir /efs\n"
     user_data << "yum install -y nfs-utils\n"
@@ -87,6 +81,11 @@ CloudFormation do
     user_data << Ref("AWS::Region")
     user_data << ".amazonaws.com:/ /efs\n"
   end
+
+  ecs_agent_extra_config.each do |key, value|
+    user_data << "echo #{key}=#{value}"
+    user_data << " >> /etc/ecs/ecs.config\n"
+  end if defined? ecs_agent_extra_config
 
   volumes = []
   volumes << {
@@ -109,11 +108,7 @@ CloudFormation do
 
 
   AutoScalingGroup('AutoScaleGroup') do
-    UpdatePolicy('AutoScalingRollingUpdate', {
-      "MinInstancesInService" => "0",
-      "MaxBatchSize"          => "1",
-      "SuspendProcesses"      => ["HealthCheck","ReplaceUnhealthy","AZRebalance","AlarmNotification","ScheduledActions"]
-    })
+    UpdatePolicy(asg_update_policy.keys[0], asg_update_policy.values[0]) if defined? asg_update_policy
     LaunchConfigurationName Ref('LaunchConfig')
     HealthCheckGracePeriod '500'
     MinSize Ref('AsgMin')
