@@ -5,7 +5,7 @@ CloudFormation do
   az_conditions_resources('SubnetCompute', maximum_availability_zones)
 
   asg_ecs_tags = []
-  asg_ecs_tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, '-xx' ]), PropagateAtLaunch: true }
+  asg_ecs_tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, 'xx' ]), PropagateAtLaunch: true }
   asg_ecs_tags << { Key: 'Environment', Value: Ref(:EnvironmentName), PropagateAtLaunch: true}
   asg_ecs_tags << { Key: 'EnvironmentType', Value: Ref(:EnvironmentType), PropagateAtLaunch: true }
   asg_ecs_tags << { Key: 'Role', Value: "ecs", PropagateAtLaunch: true }
@@ -82,6 +82,11 @@ CloudFormation do
     user_data << ".amazonaws.com:/ /efs\n"
   end
 
+  ecs_agent_extra_config.each do |key, value|
+    user_data << "echo #{key}=#{value}"
+    user_data << " >> /etc/ecs/ecs.config\n"
+  end if defined? ecs_agent_extra_config
+
   volumes = []
   volumes << {
     DeviceName: '/dev/xvda',
@@ -103,11 +108,7 @@ CloudFormation do
 
 
   AutoScalingGroup('AutoScaleGroup') do
-    UpdatePolicy('AutoScalingRollingUpdate', {
-      "MinInstancesInService" => "0",
-      "MaxBatchSize"          => "1",
-      "SuspendProcesses"      => ["HealthCheck","ReplaceUnhealthy","AZRebalance","AlarmNotification","ScheduledActions"]
-    })
+    UpdatePolicy(asg_update_policy.keys[0], asg_update_policy.values[0]) if defined? asg_update_policy
     LaunchConfigurationName Ref('LaunchConfig')
     HealthCheckGracePeriod '500'
     MinSize Ref('AsgMin')
