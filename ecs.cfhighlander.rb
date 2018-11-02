@@ -29,6 +29,8 @@ CfhighlanderTemplate do
       ComponentParam "SubnetCompute#{az}"
     end
 
+    ComponentParam 'StackOctet', 10, isGlobal: true if ((defined? securityGroups) && (securityGroups.has_key?(component_name)))
+
     ComponentParam 'VPCId', type: 'AWS::EC2::VPC::Id'
     ComponentParam 'SecurityGroupLoadBalancer', type: 'AWS::EC2::SecurityGroup::Id'
     ComponentParam 'SecurityGroupBastion', type: 'AWS::EC2::SecurityGroup::Id'

@@ -24,6 +24,7 @@ CloudFormation do
   EC2_SecurityGroup('SecurityGroupEcs') do
     GroupDescription FnJoin(' ', [ Ref('EnvironmentName'), component_name ])
     VpcId Ref('VPCId')
+    SecurityGroupIngress sg_create_rules(securityGroups[component_name], ip_blocks) if ((defined? securityGroups) && (securityGroups.has_key?(component_name)))
   end
 
   EC2_SecurityGroupIngress('LoadBalancerIngressRule') do
