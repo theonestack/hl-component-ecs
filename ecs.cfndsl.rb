@@ -122,6 +122,115 @@ CloudFormation do
     RetentionInDays "#{log_group_retention}"
   }
 
+  if defined?(ecs_autoscale)
+
+    if ecs_autoscale.has_key?('memory_high')
+
+      Resource("MemoryReservationAlarmHigh") {
+        Condition "IsProd"
+        Type 'AWS::CloudWatch::Alarm'
+        Property('AlarmDescription', "Scale-up if MemoryReservation > #{ecs_autoscale['memory_high']}% for 2 minutes")
+        Property('MetricName','MemoryReservation')
+        Property('Namespace','AWS/ECS')
+        Property('Statistic', 'Maximum')
+        Property('Period', '60')
+        Property('EvaluationPeriods', '2')
+        Property('Threshold', ecs_autoscale['memory_high'])
+        Property('AlarmActions', [ Ref('ScaleUpPolicy') ])
+        Property('Dimensions', [
+          {
+            'Name' => 'ClusterName',
+            'Value' => Ref('EcsCluster')
+          }
+        ])
+        Property('ComparisonOperator', 'GreaterThanThreshold')
+      }
+
+      Resource("MemoryReservationAlarmLow") {
+        Condition "IsProd"
+        Type 'AWS::CloudWatch::Alarm'
+        Property('AlarmDescription', "Scale-down if MemoryReservation < #{ecs_autoscale['memory_low']}%")
+        Property('MetricName','MemoryReservation')
+        Property('Namespace','AWS/ECS')
+        Property('Statistic', 'Maximum')
+        Property('Period', '60')
+        Property('EvaluationPeriods', '2')
+        Property('Threshold', ecs_autoscale['memory_low'])
+        Property('AlarmActions', [ Ref('ScaleDownPolicy') ])
+        Property('Dimensions', [
+          {
+            'Name' => 'ClusterName',
+            'Value' => Ref('EcsCluster')
+          }
+        ])
+        Property('ComparisonOperator', 'LessThanThreshold')
+      }
+    
+    end
+
+    if ecs_autoscale.has_key?('cpu_high')
+
+      Resource("CPUReservationAlarmHigh") {
+        Condition "IsProd"
+        Type 'AWS::CloudWatch::Alarm'
+        Property('AlarmDescription', "Scale-up if CPUReservation > #{ecs_autoscale['cpu_high']}%")
+        Property('MetricName','CPUReservation')
+        Property('Namespace','AWS/ECS')
+        Property('Statistic', 'Maximum')
+        Property('Period', '60')
+        Property('EvaluationPeriods', '2')
+        Property('Threshold', ecs_autoscale['cpu_high'])
+        Property('AlarmActions', [ Ref('ScaleUpPolicy') ])
+        Property('Dimensions', [
+          {
+            'Name' => 'ClusterName',
+            'Value' => Ref('EcsCluster')
+          }
+        ])
+        Property('ComparisonOperator', 'GreaterThanThreshold')
+      }
+    
+      Resource("CPUReservationAlarmLow") {
+        Condition "IsProd"
+        Type 'AWS::CloudWatch::Alarm'
+        Property('AlarmDescription', "Scale-up if CPUReservation < #{ecs_autoscale['cpu_low']}%")
+        Property('MetricName','CPUReservation')
+        Property('Namespace','AWS/ECS')
+        Property('Statistic', 'Maximum')
+        Property('Period', '60')
+        Property('EvaluationPeriods', '2')
+        Property('Threshold', ecs_autoscale['cpu_low'])
+        Property('AlarmActions', [ Ref('ScaleDownPolicy') ])
+        Property('Dimensions', [
+          {
+            'Name' => 'ClusterName',
+            'Value' => Ref('EcsCluster')
+          }
+        ])
+        Property('ComparisonOperator', 'LessThanThreshold')
+      }
+    
+    end
+
+    Resource("ScaleUpPolicy") {
+      Condition "IsProd"
+      Type 'AWS::AutoScaling::ScalingPolicy'
+      Property('AdjustmentType', 'ChangeInCapacity')
+      Property('AutoScalingGroupName', Ref('AutoScaleGroup'))
+      Property('Cooldown','300')
+      Property('ScalingAdjustment', ecs_autoscale['scale_up_adjustment'])
+    }
+
+    Resource("ScaleDownPolicy") {
+      Condition "IsProd"
+      Type 'AWS::AutoScaling::ScalingPolicy'
+      Property('AdjustmentType', 'ChangeInCapacity')
+      Property('AutoScalingGroupName', Ref('AutoScaleGroup'))
+      Property('Cooldown','300')
+      Property('ScalingAdjustment', ecs_autoscale['scale_down_adjustment'])
+    }
+  end
+
   Output("EcsCluster") {
     Value(Ref('EcsCluster'))
     Export FnSub("${EnvironmentName}-#{component_name}-EcsCluster")
