@@ -4,6 +4,8 @@ CloudFormation do
 
   az_conditions_resources('SubnetCompute', maximum_availability_zones)
 
+  Condition('IsScalingEnabled', FnEquals(Ref('EnableScaling'), 'true'))
+
   asg_ecs_tags = []
   asg_ecs_tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, 'xx' ]), PropagateAtLaunch: true }
   asg_ecs_tags << { Key: 'Environment', Value: Ref(:EnvironmentName), PropagateAtLaunch: true}
@@ -121,6 +123,115 @@ CloudFormation do
     LogGroupName Ref('AWS::StackName')
     RetentionInDays "#{log_group_retention}"
   }
+
+  if defined?(ecs_autoscale)
+
+    if ecs_autoscale.has_key?('memory_high')
+
+      Resource("MemoryReservationAlarmHigh") {
+        Condition 'IsScalingEnabled'
+        Type 'AWS::CloudWatch::Alarm'
+        Property('AlarmDescription', "Scale-up if MemoryReservation > #{ecs_autoscale['memory_high']}% for 2 minutes")
+        Property('MetricName','MemoryReservation')
+        Property('Namespace','AWS/ECS')
+        Property('Statistic', 'Maximum')
+        Property('Period', '60')
+        Property('EvaluationPeriods', '2')
+        Property('Threshold', ecs_autoscale['memory_high'])
+        Property('AlarmActions', [ Ref('ScaleUpPolicy') ])
+        Property('Dimensions', [
+          {
+            'Name' => 'ClusterName',
+            'Value' => Ref('EcsCluster')
+          }
+        ])
+        Property('ComparisonOperator', 'GreaterThanThreshold')
+      }
+
+      Resource("MemoryReservationAlarmLow") {
+        Condition 'IsScalingEnabled'
+        Type 'AWS::CloudWatch::Alarm'
+        Property('AlarmDescription', "Scale-down if MemoryReservation < #{ecs_autoscale['memory_low']}%")
+        Property('MetricName','MemoryReservation')
+        Property('Namespace','AWS/ECS')
+        Property('Statistic', 'Maximum')
+        Property('Period', '60')
+        Property('EvaluationPeriods', '2')
+        Property('Threshold', ecs_autoscale['memory_low'])
+        Property('AlarmActions', [ Ref('ScaleDownPolicy') ])
+        Property('Dimensions', [
+          {
+            'Name' => 'ClusterName',
+            'Value' => Ref('EcsCluster')
+          }
+        ])
+        Property('ComparisonOperator', 'LessThanThreshold')
+      }
+    
+    end
+
+    if ecs_autoscale.has_key?('cpu_high')
+
+      Resource("CPUReservationAlarmHigh") {
+        Condition 'IsScalingEnabled'
+        Type 'AWS::CloudWatch::Alarm'
+        Property('AlarmDescription', "Scale-up if CPUReservation > #{ecs_autoscale['cpu_high']}%")
+        Property('MetricName','CPUReservation')
+        Property('Namespace','AWS/ECS')
+        Property('Statistic', 'Maximum')
+        Property('Period', '60')
+        Property('EvaluationPeriods', '2')
+        Property('Threshold', ecs_autoscale['cpu_high'])
+        Property('AlarmActions', [ Ref('ScaleUpPolicy') ])
+        Property('Dimensions', [
+          {
+            'Name' => 'ClusterName',
+            'Value' => Ref('EcsCluster')
+          }
+        ])
+        Property('ComparisonOperator', 'GreaterThanThreshold')
+      }
+    
+      Resource("CPUReservationAlarmLow") {
+        Condition 'IsScalingEnabled'
+        Type 'AWS::CloudWatch::Alarm'
+        Property('AlarmDescription', "Scale-up if CPUReservation < #{ecs_autoscale['cpu_low']}%")
+        Property('MetricName','CPUReservation')
+        Property('Namespace','AWS/ECS')
+        Property('Statistic', 'Maximum')
+        Property('Period', '60')
+        Property('EvaluationPeriods', '2')
+        Property('Threshold', ecs_autoscale['cpu_low'])
+        Property('AlarmActions', [ Ref('ScaleDownPolicy') ])
+        Property('Dimensions', [
+          {
+            'Name' => 'ClusterName',
+            'Value' => Ref('EcsCluster')
+          }
+        ])
+        Property('ComparisonOperator', 'LessThanThreshold')
+      }
+    
+    end
+
+    Resource("ScaleUpPolicy") {
+      Condition 'IsScalingEnabled'
+      Type 'AWS::AutoScaling::ScalingPolicy'
+      Property('AdjustmentType', 'ChangeInCapacity')
+      Property('AutoScalingGroupName', Ref('AutoScaleGroup'))
+      Property('Cooldown','300')
+      Property('ScalingAdjustment', ecs_autoscale['scale_up_adjustment'])
+    }
+
+    Resource("ScaleDownPolicy") {
+      Condition 'IsScalingEnabled'
+      Type 'AWS::AutoScaling::ScalingPolicy'
+      Property('AdjustmentType', 'ChangeInCapacity')
+      Property('AutoScalingGroupName', Ref('AutoScaleGroup'))
+      Property('Cooldown','300')
+      Property('ScalingAdjustment', ecs_autoscale['scale_down_adjustment'])
+    }
+  end
 
   Output("EcsCluster") {
     Value(Ref('EcsCluster'))
