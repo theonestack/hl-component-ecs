@@ -11,11 +11,11 @@ maximum_availability_zones: 5
 #   ECS_IMAGE_CLEANUP_INTERVAL: 10m
 #   ECS_IMAGE_MINIMUM_CLEANUP_AGE: 5m
 
-# asg_update_policy:
-#   AutoScalingRollingUpdate:
-#     MaxBatchSize: 1
-#     MinInstancesInService: 1
-#     SuspendProcesses: ["HealthCheck","ReplaceUnhealthy","AZRebalance","AlarmNotification","ScheduledActions"]
+asg_update_policy:
+  AutoScalingRollingUpdate:
+    MaxBatchSize: 1
+    MinInstancesInService: 1
+    SuspendProcesses: ["HealthCheck","ReplaceUnhealthy","AZRebalance","AlarmNotification","ScheduledActions"]
 
 # volume_size: 20
 
@@ -59,3 +59,39 @@ iam_policies:
       - elasticloadbalancing:Describe*
       - elasticloadbalancing:RegisterInstancesWithLoadBalancer
       - elasticloadbalancing:RegisterTargets
+
+ecs_contianer_instance_draining:
+  custom_policies:
+    ecs:
+      action:
+        - ecs:ListContainerInstances
+        - ecs:SubmitContainerStateChange
+        - ecs:SubmitTaskStateChange
+        - ecs:DescribeContainerInstances
+        - ecs:UpdateContainerInstancesState
+        - ecs:ListTasks
+        - ecs:DescribeTasks
+      resource: '*'
+    ec2:
+      action:
+        - autoscaling:CompleteLifecycleAction
+        - ec2:DescribeInstances
+        - ec2:DescribeInstanceAttribute
+        - ec2:DescribeInstanceStatus
+        - ec2:DescribeHosts
+      resource: '*'
+  roles:
+    EcsContainerInstanceDraining:
+      policies_inline:
+        - ec2
+        - ecs
+  functions:
+    EcsContainerInstanceDraining:
+      code: ecs_contianer_instance_draining.py
+      handler: ecs_contianer_instance_draining.lambda_handler
+      runtime: python3.6
+      timeout: 310
+      role: EcsContainerInstanceDraining
+      environment:
+        CLUSTER:
+          Ref: EcsCluster

@@ -12,6 +12,7 @@ CloudFormation do
   asg_ecs_tags << { Key: 'Environment', Value: Ref(:EnvironmentName), PropagateAtLaunch: true}
   asg_ecs_tags << { Key: 'EnvironmentType', Value: Ref(:EnvironmentType), PropagateAtLaunch: true }
   asg_ecs_tags << { Key: 'Role', Value: "ecs", PropagateAtLaunch: true }
+  asg_ecs_tags << { Key: 'Cluster', Value: Ref('EcsCluster'), PropagateAtLaunch: true }
 
   asg_ecs_extra_tags = []
   ecs_extra_tags.each { |key,value| asg_ecs_extra_tags << { Key: "#{key}", Value: value, PropagateAtLaunch: true } } if defined? ecs_extra_tags
@@ -27,6 +28,11 @@ CloudFormation do
   EC2_SecurityGroup('SecurityGroupEcs') do
     GroupDescription FnJoin(' ', [ Ref('EnvironmentName'), component_name ])
     VpcId Ref('VPCId')
+    Tags([
+      { Key: 'Name', Value: FnSub("${EnvironmentName}-${EcsCluster}-access") },
+      { Key: 'Environment', Value: Ref(:EnvironmentName) },
+      { Key: 'EnvironmentType', Value: Ref(:EnvironmentType) }
+    ])
   end
 
   EC2_SecurityGroupIngress('LoadBalancerIngressRule') do
@@ -126,6 +132,37 @@ CloudFormation do
     RetentionInDays "#{log_group_retention}"
   }
 
+  Lambda_Permission('EcsContainerInstanceDrainingPermissions') {
+    Action 'lambda:InvokeFunction'
+    FunctionName Ref('EcsContainerInstanceDraining')
+    Principal 'sns.amazonaws.com'
+    SourceArn Ref('AutoScaleGroup')
+  }
+
+  AutoScaling_LifecycleHook('EcsContainerInstanceDrainingHook') {
+    AutoScalingGroupName Ref('AutoScaleGroup')
+    LifecycleTransition 'autoscaling:EC2_INSTANCE_TERMINATING'
+    DefaultResult 'CONTINUE'
+    HeartbeatTimeout 300
+    NotificationTargetARN Ref('EcsContainerInstanceDrainingTopic')
+    RoleARN FnGetAtt('EcsContainerInstanceDrainingHookRole','Arn')
+  }
+
+  Role('EcsContainerInstanceDrainingHookRole') do
+    AssumeRolePolicyDocument service_role_assume_policy('autoscaling')
+    Path '/'
+    Policies(iam_policy_allow('autoscaling',['sns:Publish'],'*'))
+  end
+
+  SNS_Topic('EcsContainerInstanceDrainingTopic') {
+    Subscription([
+      {
+        Endpoint: FnGetAtt('EcsContainerInstanceDraining','Arn'),
+        Protocol: 'lambda'
+      }
+    ])
+  }
+
   if defined?(ecs_autoscale)
 
     if ecs_autoscale.has_key?('memory_high')
@@ -169,7 +206,7 @@ CloudFormation do
         ])
         Property('ComparisonOperator', 'LessThanThreshold')
       }
-    
+
     end
 
     if ecs_autoscale.has_key?('cpu_high')
@@ -193,7 +230,7 @@ CloudFormation do
         ])
         Property('ComparisonOperator', 'GreaterThanThreshold')
       }
-    
+
       Resource("CPUReservationAlarmLow") {
         Condition 'IsScalingEnabled'
         Type 'AWS::CloudWatch::Alarm'
@@ -213,7 +250,7 @@ CloudFormation do
         ])
         Property('ComparisonOperator', 'LessThanThreshold')
       }
-    
+
     end
 
     Resource("ScaleUpPolicy") {

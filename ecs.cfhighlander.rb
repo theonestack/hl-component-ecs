@@ -6,7 +6,7 @@ CfhighlanderTemplate do
     ComponentParam 'Ami', type: 'AWS::EC2::Image::Id'
     ComponentParam 'EnableScaling', 'false', allowedValues: ['true','false']
     ComponentParam 'SpotPrice', ''
-    
+
     MappingParam('InstanceType') do
       map 'EnvironmentType'
       attribute 'EcsInstanceType'
@@ -38,4 +38,7 @@ CfhighlanderTemplate do
     ComponentParam 'FileSystem' if enable_efs
 
   end
+
+  LambdaFunctions 'ecs_contianer_instance_draining'
+  
 end
