@@ -5,6 +5,7 @@ CfhighlanderTemplate do
     ComponentParam 'EnvironmentType', 'development', isGlobal: true
     ComponentParam 'Ami', type: 'AWS::EC2::Image::Id'
     ComponentParam 'EnableScaling', 'false', allowedValues: ['true','false']
+    ComponentParam 'SpotPrice', ''
     
     MappingParam('InstanceType') do
       map 'EnvironmentType'

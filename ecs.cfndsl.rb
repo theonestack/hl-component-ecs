@@ -5,6 +5,7 @@ CloudFormation do
   az_conditions_resources('SubnetCompute', maximum_availability_zones)
 
   Condition('IsScalingEnabled', FnEquals(Ref('EnableScaling'), 'true'))
+  Condition("SpotPriceSet", FnNot(FnEquals(Ref('SpotPrice'), '')))
 
   asg_ecs_tags = []
   asg_ecs_tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, 'xx' ]), PropagateAtLaunch: true }
@@ -105,6 +106,7 @@ CloudFormation do
     IamInstanceProfile Ref('InstanceProfile')
     KeyName Ref('KeyName')
     SecurityGroups [ Ref('SecurityGroupEcs') ]
+    SpotPrice FnIf('SpotPriceSet', Ref('SpotPrice'), Ref('AWS::NoValue'))
     UserData FnBase64(FnJoin('',user_data))
   end
 
