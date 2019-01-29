@@ -28,6 +28,9 @@ maximum_availability_zones: 5
 #   # cpu_high:
 #   # cpu_low:
 
+# ecs_additional_userdata:
+# - "/ec2-bootstrap"
+
 
 component_version: 0.0.1
 log_group_retention: 14

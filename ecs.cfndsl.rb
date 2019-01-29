@@ -90,6 +90,10 @@ CloudFormation do
     user_data << " >> /etc/ecs/ecs.config\n"
   end if defined? ecs_agent_extra_config
 
+  ecs_additional_userdata.each do |user_data_line|
+    user_data << "#{user_data_line}\n"
+  end if defined? ecs_additional_userdata
+
   volumes = []
   volumes << {
     DeviceName: '/dev/xvda',
