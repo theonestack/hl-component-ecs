@@ -2,8 +2,6 @@ CloudFormation do
 
   Description "#{component_name} - #{component_version}"
 
-  az_conditions_resources('SubnetCompute', maximum_availability_zones)
-
   Condition('IsScalingEnabled', FnEquals(Ref('EnableScaling'), 'true'))
   Condition("SpotPriceSet", FnNot(FnEquals(Ref('SpotPrice'), '')))
 
@@ -121,7 +119,7 @@ CloudFormation do
     HealthCheckGracePeriod '500'
     MinSize Ref('AsgMin')
     MaxSize Ref('AsgMax')
-    VPCZoneIdentifier az_conditional_resources('SubnetCompute', maximum_availability_zones)
+    VPCZoneIdentifier Ref('SubnetIds')
     Tags asg_ecs_tags
   end
 
