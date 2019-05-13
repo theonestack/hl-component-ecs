@@ -2,10 +2,9 @@ CloudFormation do
 
   Description "#{component_name} - #{component_version}"
 
-  az_conditions_resources('SubnetCompute', maximum_availability_zones)
-
   Condition('IsScalingEnabled', FnEquals(Ref('EnableScaling'), 'true'))
   Condition("SpotPriceSet", FnNot(FnEquals(Ref('SpotPrice'), '')))
+  Condition('KeyNameSet', FnNot(FnEquals(Ref('KeyName'), '')))
 
   asg_ecs_tags = []
   asg_ecs_tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, 'xx' ]), PropagateAtLaunch: true }
@@ -108,7 +107,7 @@ CloudFormation do
     InstanceType Ref('InstanceType')
     AssociatePublicIpAddress false
     IamInstanceProfile Ref('InstanceProfile')
-    KeyName Ref('KeyName')
+    KeyName FnIf('KeyNameSet', Ref('KeyName'), Ref('AWS::NoValue'))
     SecurityGroups [ Ref('SecurityGroupEcs') ]
     SpotPrice FnIf('SpotPriceSet', Ref('SpotPrice'), Ref('AWS::NoValue'))
     UserData FnBase64(FnJoin('',user_data))
@@ -121,7 +120,7 @@ CloudFormation do
     HealthCheckGracePeriod '500'
     MinSize Ref('AsgMin')
     MaxSize Ref('AsgMax')
-    VPCZoneIdentifier az_conditional_resources('SubnetCompute', maximum_availability_zones)
+    VPCZoneIdentifier Ref('SubnetIds')
     Tags asg_ecs_tags
   end
 
@@ -173,7 +172,7 @@ CloudFormation do
         ])
         Property('ComparisonOperator', 'LessThanThreshold')
       }
-    
+
     end
 
     if ecs_autoscale.has_key?('cpu_high')
@@ -197,7 +196,7 @@ CloudFormation do
         ])
         Property('ComparisonOperator', 'GreaterThanThreshold')
       }
-    
+
       Resource("CPUReservationAlarmLow") {
         Condition 'IsScalingEnabled'
         Type 'AWS::CloudWatch::Alarm'
@@ -217,7 +216,7 @@ CloudFormation do
         ])
         Property('ComparisonOperator', 'LessThanThreshold')
       }
-    
+
     end
 
     Resource("ScaleUpPolicy") {
