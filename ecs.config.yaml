@@ -1,40 +1,13 @@
 maximum_availability_zones: 5
-
-# cluster name is prefixed with environment name
-# cluster_name: cluster
-
-# ecs_extra_tags:
-#   Name: Value
-
-# ecs_agent_extra_config:
-#   ECS_ENGINE_TASK_CLEANUP_WAIT_DURATION: 10m
-#   ECS_IMAGE_CLEANUP_INTERVAL: 10m
-#   ECS_IMAGE_MINIMUM_CLEANUP_AGE: 5m
-
-# asg_update_policy:
-#   AutoScalingRollingUpdate:
-#     MaxBatchSize: 1
-#     MinInstancesInService: 1
-#     SuspendProcesses: ["HealthCheck","ReplaceUnhealthy","AZRebalance","AlarmNotification","ScheduledActions"]
-
-# volume_size: 20
-
-# Scaling is based on reservation
-# ecs_autoscale:
-#   scale_up_adjustment: 2
-#   scale_down_adjustment: -1
-#   memory_high: 70
-#   memory_low: 30
-#   # cpu_high:
-#   # cpu_low:
-
-# ecs_additional_userdata:
-# - "/ec2-bootstrap"
-
-
-component_version: 0.0.1
 log_group_retention: 14
 
+# Set to false when you want to create
+# a fargate only ECS cluster.
+enable_ec2_cluster: true
+
+# Set to true when you want to create and
+# attache a EFS mount to your ec2 ECS cluster.
+# enable_ec2_cluster must be set to true
 enable_efs: false
 
 iam_policies:
