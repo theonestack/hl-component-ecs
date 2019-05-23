@@ -1,6 +1,13 @@
 maximum_availability_zones: 5
 log_group_retention: 14
 
+# Set to false when you want to create
+# a fargate only ECS cluster.
+enable_ec2_cluster: true
+
+# Set to true when you want to create and
+# attache a EFS mount to your ec2 ECS cluster.
+# enable_ec2_cluster must be set to true
 enable_efs: false
 
 iam_policies:

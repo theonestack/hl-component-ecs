@@ -1,0 +1,6 @@
+test_metadata:
+  type: config
+  name: fargate cluster
+  description: pure fagate cluster with no ec2
+
+enable_ec2_cluster: false
