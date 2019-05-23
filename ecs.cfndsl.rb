@@ -27,6 +27,13 @@ CloudFormation do
     EC2_SecurityGroup('SecurityGroupEcs') do
       GroupDescription FnJoin(' ', [ Ref('EnvironmentName'), component_name ])
       VpcId Ref('VPCId')
+      Metadata({
+        cfn_nag: {
+          rules_to_suppress: [
+            { id: 'F1000', reason: 'adding rules using cfn resources' }
+          ]
+        }
+      })
     end
 
     EC2_SecurityGroupIngress('LoadBalancerIngressRule') do
@@ -56,6 +63,13 @@ CloudFormation do
       AssumeRolePolicyDocument service_role_assume_policy('ec2')
       Path '/'
       Policies(policies)
+      Metadata({
+        cfn_nag: {
+          rules_to_suppress: [
+            { id: 'F3', reason: 'future considerations to further define the describe permisions' }
+          ]
+        }
+      })
     end
 
     InstanceProfile('InstanceProfile') do
