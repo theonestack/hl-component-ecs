@@ -2,13 +2,15 @@ CloudFormation do
 
   Description "#{component_name} - #{component_version}"
 
+  ecs_tags = []
+  ecs_tags.push({ Key: 'Name', Value: FnSub("${EnvironmentName}-#{component_name}") })
+  ecs_tags.push({ Key: 'EnvironmentName', Value: Ref(:EnvironmentName) })
+  ecs_tags.push({ Key: 'EnvironmentType', Value: Ref(:EnvironmentType) })
+  ecs_tags.push(*tags.map {|k,v| {Key: k, Value: FnSub(v)}}).uniq { |h| h[:Key] } if defined? tags
+
   ECS_Cluster('EcsCluster') {
     ClusterName FnSub("${EnvironmentName}-#{cluster_name}") if defined? cluster_name
-    Tags([
-      { Key: 'Name', Value: FnSub("${EnvironmentName}-#{component_name}") },
-      { Key: 'EnvironmentName', Value: Ref("EnvironmentName") },
-      { Key: 'EnvironmentType', Value: Ref("EnvironmentType") }
-    ])
+    Tags(ecs_tags)
   }
 
   if enable_ec2_cluster
@@ -16,18 +18,6 @@ CloudFormation do
     Condition('IsScalingEnabled', FnEquals(Ref('EnableScaling'), 'true'))
     Condition("SpotPriceSet", FnNot(FnEquals(Ref('SpotPrice'), '')))
     Condition('KeyNameSet', FnNot(FnEquals(Ref('KeyName'), '')))
-
-    asg_ecs_tags = []
-    asg_ecs_tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, 'xx' ]), PropagateAtLaunch: true }
-    asg_ecs_tags << { Key: 'EnvironmentName', Value: Ref(:EnvironmentName), PropagateAtLaunch: true}
-    asg_ecs_tags << { Key: 'EnvironmentType', Value: Ref(:EnvironmentType), PropagateAtLaunch: true }
-    asg_ecs_tags << { Key: 'Role', Value: "ecs", PropagateAtLaunch: true }
-
-    asg_ecs_extra_tags = []
-    ecs_extra_tags.each { |key,value| asg_ecs_extra_tags << { Key: "#{key}", Value: value, PropagateAtLaunch: true } } if defined? ecs_extra_tags
-
-
-    asg_ecs_tags = (asg_ecs_extra_tags + asg_ecs_tags).uniq { |h| h[:Key] }
 
     EC2_SecurityGroup('SecurityGroupEcs') do
       GroupDescription FnJoin(' ', [ Ref('EnvironmentName'), component_name ])
@@ -39,6 +29,7 @@ CloudFormation do
           ]
         }
       })
+      Tags(ecs_tags)
     end
 
     EC2_SecurityGroupIngress('LoadBalancerIngressRule') do
@@ -82,67 +73,70 @@ CloudFormation do
       Roles [Ref('Role')]
     end
 
-    user_data = []
-    user_data << "#!/bin/bash\n"
-    user_data << "INSTANCE_ID=$(/opt/aws/bin/ec2-metadata --instance-id|/usr/bin/awk '{print $2}')\n"
-    user_data << "hostname "
-    user_data << Ref("EnvironmentName")
-    user_data << "-ecs-${INSTANCE_ID}\n"
-    user_data << "sed '/HOSTNAME/d' /etc/sysconfig/network > /tmp/network && mv -f /tmp/network /etc/sysconfig/network && echo \"HOSTNAME="
-    user_data << Ref('EnvironmentName')
-    user_data << "-ecs-${INSTANCE_ID}\" >>/etc/sysconfig/network && /etc/init.d/network restart\n"
-    user_data << "echo ECS_CLUSTER="
-    user_data << Ref("EcsCluster")
-    user_data << " >> /etc/ecs/ecs.config\n"
-    if enable_efs
-      user_data << "mkdir /efs\n"
-      user_data << "yum install -y nfs-utils\n"
-      user_data << "mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 "
-      user_data << Ref("FileSystem")
-      user_data << ".efs."
-      user_data << Ref("AWS::Region")
-      user_data << ".amazonaws.com:/ /efs\n"
-    end
+    ecs_tags.push({ Key: 'Role', Value: "ecs" })
+    ecs_tags.push({ Key: 'Name', Value: FnSub("${EnvironmentName}-ecs-xx") })
+    ecs_tags.push(*instance_tags.map {|k,v| {Key: k, Value: FnSub(v)}}).uniq { |h| h[:Key] } if defined? instance_tags
 
-    ecs_agent_extra_config.each do |key, value|
-      user_data << "echo #{key}=#{value}"
-      user_data << " >> /etc/ecs/ecs.config\n"
+    # Setup userdata string
+    instance_userdata = "#!/bin/bash\nset -o xtrace\n"
+    instance_userdata << userdata if defined? userdata
+    ecs_agent_extra_config.each do |key,value|
+      instance_userdata << "echo #{key}=#{value} >> /etc/ecs/ecs.config\n"
     end if defined? ecs_agent_extra_config
+    instance_userdata << efs_mount if enable_efs
+    instance_userdata << cfnsignal if defined? cfnsignal
 
-    ecs_additional_userdata.each do |user_data_line|
-      user_data << "#{user_data_line}\n"
-    end if defined? ecs_additional_userdata
+    template_data = {
+        SecurityGroupIds: [ Ref(:SecurityGroupEcs) ],
+        TagSpecifications: [
+          { ResourceType: 'instance', Tags: ecs_tags },
+          { ResourceType: 'volume', Tags: ecs_tags }
+        ],
+        UserData: FnBase64(FnSub(instance_userdata)),
+        IamInstanceProfile: { Name: Ref(:InstanceProfile) },
+        KeyName: FnIf('KeyNameSet', Ref('KeyName'), Ref('AWS::NoValue')),
+        ImageId: Ref('Ami'),
+        Monitoring: { Enabled: detailed_monitoring },
+        InstanceType: Ref('InstanceType')
+    }
 
-    volumes = []
-    volumes << {
-      DeviceName: '/dev/xvda',
-      Ebs: {
-        VolumeSize: volume_size
+    if defined? spot
+      spot_options = {
+        MarketType: 'spot',
+        SpotOptions: {
+          SpotInstanceType: (defined?(spot['type']) ? spot['type'] : 'one-time'),
+          MaxPrice: FnSub(spot['price'])
+        }
       }
-    } if defined? volume_size
-
-    LaunchConfiguration('LaunchConfig') do
-      ImageId Ref('Ami')
-      BlockDeviceMappings volumes if defined? volume_size
-      InstanceType Ref('InstanceType')
-      AssociatePublicIpAddress false
-      IamInstanceProfile Ref('InstanceProfile')
-      KeyName FnIf('KeyNameSet', Ref('KeyName'), Ref('AWS::NoValue'))
-      SecurityGroups [ Ref('SecurityGroupEcs') ]
-      SpotPrice FnIf('SpotPriceSet', Ref('SpotPrice'), Ref('AWS::NoValue'))
-      UserData FnBase64(FnJoin('',user_data))
+      template_data[:InstanceMarketOptions] = FnIf('SpotPriceSet', spot_options, Ref('AWS::NoValue'))
     end
 
+    if defined? volumes
+      template_data[:BlockDeviceMappings] = volumes
+    end
 
-    AutoScalingGroup('AutoScaleGroup') do
-      UpdatePolicy(asg_update_policy.keys[0], asg_update_policy.values[0]) if defined? asg_update_policy
-      LaunchConfigurationName Ref('LaunchConfig')
-      HealthCheckGracePeriod '500'
+    EC2_LaunchTemplate(:LaunchTemplate) {
+      LaunchTemplateData(template_data)
+    }
+
+    AutoScaling_AutoScalingGroup(:AutoScaleGroup) {
+      # UpdatePolicy(update_policy) if defined? update_policy
+      # UpdatePolicy(:AutoScalingRollingUpdate, {
+      #   MaxBatchSize: '1',
+      #   MinInstancesInService: FnIf('SpotPriceSet', 0, Ref('DesiredCapacity')),
+      #   SuspendProcesses: %w(HealthCheck ReplaceUnhealthy AZRebalance AlarmNotification ScheduledActions),
+      #   PauseTime: 'PT5M'
+      # })
+      DesiredCapacity Ref('AsgDesired')
       MinSize Ref('AsgMin')
       MaxSize Ref('AsgMax')
       VPCZoneIdentifier Ref('SubnetIds')
-      Tags asg_ecs_tags
-    end
+      LaunchTemplate({
+        LaunchTemplateId: Ref(:LaunchTemplate),
+        Version: FnGetAtt(:LaunchTemplate, :LatestVersionNumber)
+      })
+    }
+
 
     Logs_LogGroup('LogGroup') {
       LogGroupName Ref('AWS::StackName')
