@@ -12,6 +12,7 @@ CfhighlanderTemplate do
       ComponentParam 'InstanceType'
       ComponentParam 'AsgMin', '1'
       ComponentParam 'AsgMax', '2'
+      ComponentParam 'AsgDesired', '1'
       ComponentParam 'KeyName', ''
       ComponentParam 'SubnetIds', type: 'CommaDelimitedList'
 
