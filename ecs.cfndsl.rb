@@ -19,17 +19,37 @@ CloudFormation do
     Condition("SpotPriceSet", FnNot(FnEquals(Ref('SpotPrice'), '')))
     Condition('KeyNameSet', FnNot(FnEquals(Ref('KeyName'), '')))
 
-    EC2_SecurityGroup('SecurityGroupEcs') do
-      GroupDescription FnJoin(' ', [ Ref('EnvironmentName'), component_name ])
+    ingress = []
+    security_group_rules.each do |rule|
+      sg_rule = {
+        FromPort: rule['from_port'],
+        IpProtocol: rule['protocol'],
+        ToPort: rule['to_port']
+      }
+
+      if rule['security_group_id']
+        sg_rule['SourceSecurityGroupId'] = FnSub(rule['security_group_id'])
+      else
+        sg_rule['CidrIp'] = FnSub(rule['ip'])
+      end
+      if rule['desc']
+        sg_rule['Description'] = FnSub(rule['desc'])
+      end
+      ingress << sg_rule
+    end if defined?(security_group_rules)
+
+    EC2_SecurityGroup "SecurityGroupEcs" do
       VpcId Ref('VPCId')
-      Metadata({
-        cfn_nag: {
-          rules_to_suppress: [
-            { id: 'F1000', reason: 'adding rules using cfn resources' }
-          ]
+      GroupDescription FnSub("${EnvironmentName}-#{component_name}")
+      SecurityGroupIngress ingress if ingress.any?
+      SecurityGroupEgress ([
+        {
+          CidrIp: "0.0.0.0/0",
+          Description: "outbound all for ports",
+          IpProtocol: -1,
         }
-      })
-      Tags(ecs_tags)
+      ])
+      Tags ecs_tags
     end
 
     EC2_SecurityGroupIngress('LoadBalancerIngressRule') do
