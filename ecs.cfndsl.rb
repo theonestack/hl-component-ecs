@@ -19,29 +19,9 @@ CloudFormation do
     Condition("SpotPriceSet", FnNot(FnEquals(Ref('SpotPrice'), '')))
     Condition('KeyNameSet', FnNot(FnEquals(Ref('KeyName'), '')))
 
-    ingress = []
-    security_group_rules.each do |rule|
-      sg_rule = {
-        FromPort: rule['from_port'],
-        IpProtocol: rule['protocol'],
-        ToPort: rule['to_port']
-      }
-
-      if rule['security_group_id']
-        sg_rule['SourceSecurityGroupId'] = FnSub(rule['security_group_id'])
-      else
-        sg_rule['CidrIp'] = FnSub(rule['ip'])
-      end
-      if rule['desc']
-        sg_rule['Description'] = FnSub(rule['desc'])
-      end
-      ingress << sg_rule
-    end if defined?(security_group_rules)
-
     EC2_SecurityGroup "SecurityGroupEcs" do
       VpcId Ref('VPCId')
       GroupDescription FnSub("${EnvironmentName}-#{component_name}")
-      SecurityGroupIngress ingress if ingress.any?
       SecurityGroupEgress ([
         {
           CidrIp: "0.0.0.0/0",
@@ -51,6 +31,18 @@ CloudFormation do
       ])
       Tags ecs_tags
     end
+
+    security_groups.each do |sg|
+      EC2_SecurityGroupIngress("SecurityGroupRule#{sg['name']}") do
+        Description FnSub(sg['desc']) if sg.has_key? 'desc'
+        IpProtocol (sg.has_key?('protocol') ? sg['protocol'] : 'tcp')
+        FromPort sg['from']
+        ToPort (sg.key?('to') ? sg['to'] : sg['from'])
+        GroupId FnGetAtt("SecurityGroupEcs",'GroupId')
+        SourceSecurityGroupId sg.key?('securty_group') ? FnSub(sg['source_securty_group_ip']) : FnGetAtt("SecurityGroupEcs",'GroupId') unless sg.has_key?('cidrip')
+        CidrIp sg['cidrip'] if sg.has_key?('cidrip')
+      end
+    end if defined? security_groups
 
     EC2_SecurityGroupIngress('LoadBalancerIngressRule') do
       Description 'Ephemeral port range for ECS'

@@ -1,0 +1,16 @@
+test_metadata:
+  type: config
+  name: security_groups
+  description: dynamic security group rules
+
+# Insert your tests here
+security_groups:
+  -
+    name: efs
+    from: 2049
+    desc: Allow EFS access from ECS instances
+  -
+    name: https
+    from: 443
+    desc: Allow HTTPS access from loadbalancer security group
+    source_securty_group_ip: sg-fsrr54wr5t4w
