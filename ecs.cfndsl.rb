@@ -310,4 +310,11 @@ CloudFormation do
     Export FnSub("${EnvironmentName}-#{component_name}-EcsClusterArn")
   }
 
+  if enable_ec2_cluster
+    Output("AutoScalingGroupName") {
+      Value(Ref('AutoScaleGroup'))
+      Export FnSub("${EnvironmentName}-#{component_name}-AutoScalingGroupName")
+    }
+  end
+
 end
