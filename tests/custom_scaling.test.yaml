@@ -1,0 +1,30 @@
+test_metadata:
+  type: config
+  name: custom_scaling
+  description: testing with custom metrics for scaling alarms
+
+
+ecs_autoscale:
+  scale_up_adjustment: 2
+  scale_down_adjustment: -1
+  custom_scaling:
+    up:
+      cooldown: 150
+      threshold: 60
+      evaluation_periods: 2
+      metric_name: CPUUtilization
+      namespace: AWS/EC2
+      dimensions:
+        -
+          Name: AutoScalingGroupName
+          Value: blah
+    down:
+      cooldown: 600
+      threshold: 30
+      evaluation_periods: 5
+      metric_name: CPUUtilization
+      namespace: AWS/EC2
+      dimensions:
+        -
+          Name: AutoScalingGroupName
+          Value: blah

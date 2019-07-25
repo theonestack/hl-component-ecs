@@ -151,6 +151,42 @@ CloudFormation do
 
     if defined?(ecs_autoscale)
 
+      if ecs_autoscale.has_key?('custom_scaling')
+
+        default_alarm = {}
+        default_alarm['statistic'] = 'Average'
+        default_alarm['period'] = '60'
+        default_alarm['evaluation_periods'] = '5'
+
+        CloudWatch_Alarm(:ServiceScaleUpAlarm) {
+          Condition 'IsScalingEnabled'
+          AlarmDescription FnJoin(' ', [Ref('EnvironmentName'), "#{component_name} ecs scale up alarm"])
+          MetricName ecs_autoscale['custom_scaling']['up']['metric_name']
+          Namespace ecs_autoscale['custom_scaling']['up']['namespace']
+          Statistic ecs_autoscale['custom_scaling']['up']['statistic'] || default_alarm['statistic']
+          Period (ecs_autoscale['custom_scaling']['up']['period'] || default_alarm['period']).to_s
+          EvaluationPeriods ecs_autoscale['custom_scaling']['up']['evaluation_periods'].to_s
+          Threshold ecs_autoscale['custom_scaling']['up']['threshold'].to_s
+          AlarmActions [Ref(:ScaleUpPolicy)]
+          ComparisonOperator 'GreaterThanThreshold'
+          Dimensions ecs_autoscale['custom_scaling']['up']['dimensions']
+        }
+
+        CloudWatch_Alarm(:ServiceScaleDownAlarm) {
+          Condition 'IsScalingEnabled'
+          AlarmDescription FnJoin(' ', [Ref('EnvironmentName'), "#{component_name} ecs scale down alarm"])
+          MetricName ecs_autoscale['custom_scaling']['down']['metric_name']
+          Namespace ecs_autoscale['custom_scaling']['down']['namespace']
+          Statistic ecs_autoscale['custom_scaling']['down']['statistic'] || default_alarm['statistic']
+          Period (ecs_autoscale['custom_scaling']['down']['period'] || default_alarm['period']).to_s
+          EvaluationPeriods ecs_autoscale['custom_scaling']['down']['evaluation_periods'].to_s
+          Threshold ecs_autoscale['custom_scaling']['down']['threshold'].to_s
+          AlarmActions [Ref(:ScaleDownPolicy)]
+          ComparisonOperator 'LessThanThreshold'
+          Dimensions ecs_autoscale['custom_scaling']['down']['dimensions']
+        }
+      end
+
       if ecs_autoscale.has_key?('memory_high')
 
         Resource("MemoryReservationAlarmHigh") {
@@ -273,5 +309,12 @@ CloudFormation do
     Value(FnGetAtt('EcsCluster','Arn'))
     Export FnSub("${EnvironmentName}-#{component_name}-EcsClusterArn")
   }
+
+  if enable_ec2_cluster
+    Output("AutoScalingGroupName") {
+      Value(Ref('AutoScaleGroup'))
+      Export FnSub("${EnvironmentName}-#{component_name}-AutoScalingGroupName")
+    }
+  end
 
 end
