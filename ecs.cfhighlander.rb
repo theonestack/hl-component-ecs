@@ -17,9 +17,9 @@ CfhighlanderTemplate do
       ComponentParam 'SubnetIds', type: 'CommaDelimitedList'
 
       ComponentParam 'VPCId', type: 'AWS::EC2::VPC::Id'
-      ComponentParam 'SecurityGroupLoadBalancer', type: 'AWS::EC2::SecurityGroup::Id'
-      ComponentParam 'SecurityGroupBastion', type: 'AWS::EC2::SecurityGroup::Id'
       ComponentParam 'FileSystem' if enable_efs
+      
+      ComponentParam 'LaunchTemplateVersion', 'latest', allowedValues: ['latest','default']
     end
 
   end

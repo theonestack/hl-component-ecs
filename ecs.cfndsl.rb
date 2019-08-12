@@ -18,10 +18,12 @@ CloudFormation do
     Condition('IsScalingEnabled', FnEquals(Ref('EnableScaling'), 'true'))
     Condition("SpotPriceSet", FnNot(FnEquals(Ref('SpotPrice'), '')))
     Condition('KeyNameSet', FnNot(FnEquals(Ref('KeyName'), '')))
+    Condition('LaunchTemplateVersion', FnEquals(Ref('LaunchTemplateVersion'), 'default'))
 
     EC2_SecurityGroup "SecurityGroupEcs" do
       VpcId Ref('VPCId')
       GroupDescription FnSub("${EnvironmentName}-#{component_name}")
+      SecurityGroupIngress generate_security_group_rules(security_group_rules,ip_blocks) if defined? security_group_rules
       SecurityGroupEgress ([
         {
           CidrIp: "0.0.0.0/0",
@@ -30,36 +32,6 @@ CloudFormation do
         }
       ])
       Tags ecs_tags
-    end
-
-    security_groups.each do |sg|
-      EC2_SecurityGroupIngress("SecurityGroupRule#{sg['name']}") do
-        Description FnSub(sg['desc']) if sg.has_key? 'desc'
-        IpProtocol (sg.has_key?('protocol') ? sg['protocol'] : 'tcp')
-        FromPort sg['from']
-        ToPort (sg.key?('to') ? sg['to'] : sg['from'])
-        GroupId FnGetAtt("SecurityGroupEcs",'GroupId')
-        SourceSecurityGroupId sg.key?('securty_group') ? FnSub(sg['source_securty_group_ip']) : FnGetAtt("SecurityGroupEcs",'GroupId') unless sg.has_key?('cidrip')
-        CidrIp sg['cidrip'] if sg.has_key?('cidrip')
-      end
-    end if defined? security_groups
-
-    EC2_SecurityGroupIngress('LoadBalancerIngressRule') do
-      Description 'Ephemeral port range for ECS'
-      IpProtocol 'tcp'
-      FromPort '32768'
-      ToPort '65535'
-      GroupId FnGetAtt('SecurityGroupEcs','GroupId')
-      SourceSecurityGroupId Ref('SecurityGroupLoadBalancer')
-    end
-
-    EC2_SecurityGroupIngress('BastionIngressRule') do
-      Description 'SSH access from bastion'
-      IpProtocol 'tcp'
-      FromPort '22'
-      ToPort '22'
-      GroupId FnGetAtt('SecurityGroupEcs','GroupId')
-      SourceSecurityGroupId Ref('SecurityGroupBastion')
     end
 
     policies = []
@@ -132,20 +104,16 @@ CloudFormation do
     }
 
     AutoScaling_AutoScalingGroup(:AutoScaleGroup) {
-      # UpdatePolicy(update_policy) if defined? update_policy
-      # UpdatePolicy(:AutoScalingRollingUpdate, {
-      #   MaxBatchSize: '1',
-      #   MinInstancesInService: FnIf('SpotPriceSet', 0, Ref('DesiredCapacity')),
-      #   SuspendProcesses: %w(HealthCheck ReplaceUnhealthy AZRebalance AlarmNotification ScheduledActions),
-      #   PauseTime: 'PT5M'
-      # })
+      if defined? asg_update_policy
+        UpdatePolicy(asg_update_policy.keys[0], asg_update_policy.values[0]) 
+      end
       DesiredCapacity Ref('AsgDesired')
       MinSize Ref('AsgMin')
       MaxSize Ref('AsgMax')
       VPCZoneIdentifier Ref('SubnetIds')
       LaunchTemplate({
         LaunchTemplateId: Ref(:LaunchTemplate),
-        Version: FnGetAtt(:LaunchTemplate, :LatestVersionNumber)
+        Version: FnIf('LaunchTemplateVersion', FnGetAtt(:LaunchTemplate, :DefaultVersionNumber), FnGetAtt(:LaunchTemplate, :LatestVersionNumber))
       })
     }
 
