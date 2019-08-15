@@ -59,7 +59,8 @@ CloudFormation do
 
     ecs_tags.push({ Key: 'Role', Value: "ecs" })
     ecs_tags.push({ Key: 'Name', Value: FnSub("${EnvironmentName}-ecs-xx") })
-    ecs_tags.push(*instance_tags.map {|k,v| {Key: k, Value: FnSub(v)}}).uniq { |h| h[:Key] } if defined? instance_tags
+    ecs_tags.push(*instance_tags.map {|k,v| {Key: k, Value: FnSub(v)}}) if defined? instance_tags
+    ecs_tags = ecs_tags.reverse.uniq { |h| h[:Key] }
 
     # Setup userdata string
     instance_userdata = "#!/bin/bash\nset -o xtrace\n"
