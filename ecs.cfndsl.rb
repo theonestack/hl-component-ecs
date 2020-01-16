@@ -6,7 +6,7 @@ CloudFormation do
     ClusterName FnSub("${EnvironmentName}-#{cluster_name}") if defined? cluster_name
     Tags([
       { Key: 'Name', Value: FnSub("${EnvironmentName}-#{component_name}") },
-      { Key: 'EnvironmentName', Value: Ref("EnvironmentName") },
+      { Key: 'Environment', Value: Ref("EnvironmentName") },
       { Key: 'EnvironmentType', Value: Ref("EnvironmentType") }
     ])
   }
@@ -19,7 +19,7 @@ CloudFormation do
 
     asg_ecs_tags = []
     asg_ecs_tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, 'xx' ]), PropagateAtLaunch: true }
-    asg_ecs_tags << { Key: 'EnvironmentName', Value: Ref(:EnvironmentName), PropagateAtLaunch: true}
+    asg_ecs_tags << { Key: 'Environment', Value: Ref(:EnvironmentName), PropagateAtLaunch: true}
     asg_ecs_tags << { Key: 'EnvironmentType', Value: Ref(:EnvironmentType), PropagateAtLaunch: true }
     asg_ecs_tags << { Key: 'Role', Value: "ecs", PropagateAtLaunch: true }
 
