@@ -1,36 +1,37 @@
 CloudFormation do
 
-  Description "#{component_name} - #{component_version}"
+  Description "#{external_parameters[:component_name]} - #{external_parameters[:component_version]}"
 
   ECS_Cluster('EcsCluster') {
-    ClusterName FnSub("${EnvironmentName}-#{cluster_name}") if defined? cluster_name
+    ClusterName FnSub("${EnvironmentName}-#{external_parameters[:cluster_name]}")
     Tags([
-      { Key: 'Name', Value: FnSub("${EnvironmentName}-#{component_name}") },
+      { Key: 'Name', Value: FnSub("${EnvironmentName}-#{external_parameters[:component_name]}") },
       { Key: 'Environment', Value: Ref("EnvironmentName") },
       { Key: 'EnvironmentType', Value: Ref("EnvironmentType") }
     ])
   }
 
-  if enable_ec2_cluster
+  if external_parameters[:enable_ec2_cluster]
 
     Condition('IsScalingEnabled', FnEquals(Ref('EnableScaling'), 'true'))
     Condition("SpotPriceSet", FnNot(FnEquals(Ref('SpotPrice'), '')))
     Condition('KeyNameSet', FnNot(FnEquals(Ref('KeyName'), '')))
 
     asg_ecs_tags = []
-    asg_ecs_tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), component_name, 'xx' ]), PropagateAtLaunch: true }
+    asg_ecs_tags << { Key: 'Name', Value: FnJoin('-', [ Ref(:EnvironmentName), external_parameters[:component_name], 'xx' ]), PropagateAtLaunch: true }
     asg_ecs_tags << { Key: 'Environment', Value: Ref(:EnvironmentName), PropagateAtLaunch: true}
     asg_ecs_tags << { Key: 'EnvironmentType', Value: Ref(:EnvironmentType), PropagateAtLaunch: true }
     asg_ecs_tags << { Key: 'Role', Value: "ecs", PropagateAtLaunch: true }
 
     asg_ecs_extra_tags = []
-    ecs_extra_tags.each { |key,value| asg_ecs_extra_tags << { Key: "#{key}", Value: value, PropagateAtLaunch: true } } if defined? ecs_extra_tags
+    ecs_extra_tags = external_parameters.fetch(:ecs_extra_tags, {})
+    ecs_extra_tags.each { |key,value| asg_ecs_extra_tags << { Key: "#{key}", Value: value, PropagateAtLaunch: true } }
 
 
     asg_ecs_tags = (asg_ecs_extra_tags + asg_ecs_tags).uniq { |h| h[:Key] }
 
     EC2_SecurityGroup('SecurityGroupEcs') do
-      GroupDescription FnJoin(' ', [ Ref('EnvironmentName'), component_name ])
+      GroupDescription FnJoin(' ', [ Ref('EnvironmentName'), external_parameters[:component_name] ])
       VpcId Ref('VPCId')
       Metadata({
         cfn_nag: {
@@ -60,9 +61,9 @@ CloudFormation do
     end
 
     policies = []
-    iam_policies.each do |name,policy|
+    external_parameters[:iam_policies].each do |name,policy|
       policies << iam_policy_allow(name,policy['action'],policy['resource'] || '*')
-    end if defined? iam_policies
+    end
 
     Role('Role') do
       AssumeRolePolicyDocument service_role_assume_policy('ec2')
@@ -94,7 +95,7 @@ CloudFormation do
     user_data << "echo ECS_CLUSTER="
     user_data << Ref("EcsCluster")
     user_data << " >> /etc/ecs/ecs.config\n"
-    if enable_efs
+    if external_parameters[:enable_efs]
       user_data << "mkdir /efs\n"
       user_data << "yum install -y nfs-utils\n"
       user_data << "mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 "
@@ -104,26 +105,29 @@ CloudFormation do
       user_data << ".amazonaws.com:/ /efs\n"
     end
 
+    ecs_agent_extra_config = external_parameters.fetch(:ecs_agent_extra_config, {})
     ecs_agent_extra_config.each do |key, value|
       user_data << "echo #{key}=#{value}"
       user_data << " >> /etc/ecs/ecs.config\n"
-    end if defined? ecs_agent_extra_config
+    end
 
+    ecs_additional_userdata = external_parameters.fetch(:ecs_additional_userdata, {})
     ecs_additional_userdata.each do |user_data_line|
       user_data << "#{user_data_line}\n"
-    end if defined? ecs_additional_userdata
+    end
 
     volumes = []
+    volume_size = external_parameters.fetch(:volume_size, nil)
     volumes << {
       DeviceName: '/dev/xvda',
       Ebs: {
         VolumeSize: volume_size
       }
-    } if defined? volume_size
+    } unless volume_size.nil?
 
     LaunchConfiguration('LaunchConfig') do
       ImageId Ref('Ami')
-      BlockDeviceMappings volumes if defined? volume_size
+      BlockDeviceMappings volumes unless volume_size.nil?
       InstanceType Ref('InstanceType')
       AssociatePublicIpAddress false
       IamInstanceProfile Ref('InstanceProfile')
@@ -133,9 +137,9 @@ CloudFormation do
       UserData FnBase64(FnJoin('',user_data))
     end
 
-
+    asg_update_policy = external_parameters.fetch(:asg_update_policy, {})
     AutoScalingGroup('AutoScaleGroup') do
-      UpdatePolicy(asg_update_policy.keys[0], asg_update_policy.values[0]) if defined? asg_update_policy
+      UpdatePolicy(asg_update_policy.keys[0], asg_update_policy.values[0]) unless asg_update_policy.empty?
       LaunchConfigurationName Ref('LaunchConfig')
       HealthCheckGracePeriod '500'
       MinSize Ref('AsgMin')
@@ -144,12 +148,14 @@ CloudFormation do
       Tags asg_ecs_tags
     end
 
+    log_group_retention = external_parameters.fetch(:log_group_retention, 14)
     Logs_LogGroup('LogGroup') {
       LogGroupName Ref('AWS::StackName')
       RetentionInDays "#{log_group_retention}"
     }
 
-    if defined?(ecs_autoscale)
+    ecs_autoscale = external_parameters.fetch(:ecs_autoscale, {})
+    unless ecs_autoscale.empty?
 
       if ecs_autoscale.has_key?('custom_scaling')
 
@@ -160,7 +166,7 @@ CloudFormation do
 
         CloudWatch_Alarm(:ServiceScaleUpAlarm) {
           Condition 'IsScalingEnabled'
-          AlarmDescription FnJoin(' ', [Ref('EnvironmentName'), "#{component_name} ecs scale up alarm"])
+          AlarmDescription FnJoin(' ', [Ref('EnvironmentName'), "#{external_parameters[:component_name]} ecs scale up alarm"])
           MetricName ecs_autoscale['custom_scaling']['up']['metric_name']
           Namespace ecs_autoscale['custom_scaling']['up']['namespace']
           Statistic ecs_autoscale['custom_scaling']['up']['statistic'] || default_alarm['statistic']
@@ -174,7 +180,7 @@ CloudFormation do
 
         CloudWatch_Alarm(:ServiceScaleDownAlarm) {
           Condition 'IsScalingEnabled'
-          AlarmDescription FnJoin(' ', [Ref('EnvironmentName'), "#{component_name} ecs scale down alarm"])
+          AlarmDescription FnJoin(' ', [Ref('EnvironmentName'), "#{external_parameters[:component_name]} ecs scale down alarm"])
           MetricName ecs_autoscale['custom_scaling']['down']['metric_name']
           Namespace ecs_autoscale['custom_scaling']['down']['namespace']
           Statistic ecs_autoscale['custom_scaling']['down']['statistic'] || default_alarm['statistic']
@@ -296,24 +302,24 @@ CloudFormation do
 
     Output('EcsSecurityGroup') {
       Value(Ref('SecurityGroupEcs'))
-      Export FnSub("${EnvironmentName}-#{component_name}-EcsSecurityGroup")
+      Export FnSub("${EnvironmentName}-#{external_parameters[:component_name]}-EcsSecurityGroup")
     }
 
   end
 
   Output("EcsCluster") {
     Value(Ref('EcsCluster'))
-    Export FnSub("${EnvironmentName}-#{component_name}-EcsCluster")
+    Export FnSub("${EnvironmentName}-#{external_parameters[:component_name]}-EcsCluster")
   }
   Output("EcsClusterArn") {
     Value(FnGetAtt('EcsCluster','Arn'))
-    Export FnSub("${EnvironmentName}-#{component_name}-EcsClusterArn")
+    Export FnSub("${EnvironmentName}-#{external_parameters[:component_name]}-EcsClusterArn")
   }
 
-  if enable_ec2_cluster
+  if external_parameters[:enable_ec2_cluster]
     Output("AutoScalingGroupName") {
       Value(Ref('AutoScaleGroup'))
-      Export FnSub("${EnvironmentName}-#{component_name}-AutoScalingGroupName")
+      Export FnSub("${EnvironmentName}-#{external_parameters[:component_name]}-AutoScalingGroupName")
     }
   end
 
