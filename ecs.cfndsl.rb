@@ -1,9 +1,11 @@
 CloudFormation do
 
   Description "#{external_parameters[:component_name]} - #{external_parameters[:component_version]}"
-
+  
+  cluster_name = external_parameters.fetch(:cluster_name, nil)
+  
   ECS_Cluster('EcsCluster') {
-    ClusterName FnSub("${EnvironmentName}-#{external_parameters[:cluster_name]}")
+    ClusterName FnSub("${EnvironmentName}-#{cluster_name}") unless cluster_name.nil?
     Tags([
       { Key: 'Name', Value: FnSub("${EnvironmentName}-#{external_parameters[:component_name]}") },
       { Key: 'Environment', Value: Ref("EnvironmentName") },
