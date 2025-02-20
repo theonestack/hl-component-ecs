@@ -80,7 +80,7 @@ CloudFormation do
       })
     end
 
-    InstanceProfile('InstanceProfile') do
+    IAM_InstanceProfile('InstanceProfile') do
       Path '/'
       Roles [Ref('Role')]
     end
